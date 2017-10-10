@@ -1,0 +1,8 @@
+[package]
+name = "intervaltree"
+version = "0.1.0"
+authors = ["main() <main@ehvag.de>"]
+license = "MIT"
+description = "A simple and generic implementation of an immutable interval tree."
+
+[dependencies]
