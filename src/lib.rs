@@ -4,10 +4,12 @@
 use std::ops::Range;
 use std::iter::FromIterator;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
+use std::slice::Iter;
+use std::vec::IntoIter;
 use std::cmp;
 
 /// An element of an interval tree.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Element<K, V> {
     /// The range associated with this element.
     pub range: Range<K>,
@@ -15,7 +17,8 @@ pub struct Element<K, V> {
     pub value: V,
 }
 
-struct Node<K, V> {
+#[derive(Clone, Debug, Hash)]
+struct Node<K, V>{
     element: Element<K, V>,
     max: K,
 }
@@ -24,6 +27,7 @@ struct Node<K, V> {
 ///
 /// To build it, always use `FromIterator`. This is not very optimized
 /// as it takes `O(log n)` stack (it uses recursion) but runs in `O(n log n)`.
+#[derive(Clone, Debug, Hash)]
 pub struct IntervalTree<K, V> {
     data: Vec<Node<K, V>>,
 }
@@ -37,6 +41,46 @@ impl<K: Ord + Clone, V> FromIterator<(Range<K>, V)> for IntervalTree<K, V> {
         Self::update_max(&mut nodes);
 
         IntervalTree { data: nodes }
+    }
+}
+
+/// An iterator over all the elements in the tree (in no particular order).
+pub struct TreeIter<'a, K: 'a, V: 'a>(Iter<'a, Node<K, V>>);
+
+impl<'a, K: 'a, V: 'a> Iterator for TreeIter<'a, K, V> {
+    type Item = &'a Element<K, V>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next().map(|x| &x.element)
+    }
+}
+
+impl<'a, K: 'a + Ord, V: 'a> IntoIterator for &'a IntervalTree<K, V> {
+    type Item = &'a Element<K, V>;
+    type IntoIter = TreeIter<'a, K, V>;
+
+    fn into_iter(self) -> TreeIter<'a, K, V> {
+        self.iter()
+    }
+}
+
+/// An iterator that moves out of an interval tree.
+pub struct TreeIntoIter<K, V>(IntoIter<Node<K, V>>);
+
+impl<K, V> IntoIterator for IntervalTree<K, V> {
+    type Item = Element<K, V>;
+    type IntoIter = TreeIntoIter<K, V>;
+
+    fn into_iter(self) -> TreeIntoIter<K, V> {
+        TreeIntoIter(self.data.into_iter())
+    }
+}
+
+impl<K, V> Iterator for TreeIntoIter<K, V> {
+    type Item = Element<K, V>;
+
+    fn next(&mut self) -> Option<Element<K, V>> {
+        self.0.next().map(|x| x.element)
     }
 }
 
@@ -85,6 +129,11 @@ impl<K: Ord, V> IntervalTree<K, V> {
             query: Query::Point(point),
             todo: vec![(0, self.data.len())],
         }
+    }
+
+    /// Returns an iterator over all elements in the tree (in no particular order).
+    pub fn iter(&self) -> TreeIter<K, V> {
+        TreeIter(self.data.iter())
     }
 }
 
@@ -168,7 +217,6 @@ impl<'a, K: Ord, V> Iterator for QueryIter<'a, K, V> {
                     }
 
                     // finally, search this
-                    //if self.query.point() < node.range.end {
                     if self.query.intersect(&node.element.range) {
                         return Some(&node.element);
                     }
