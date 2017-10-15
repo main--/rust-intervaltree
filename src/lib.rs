@@ -6,11 +6,18 @@ use std::iter::FromIterator;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::cmp;
 
-struct Node<K, V> {
-    range: Range<K>,
-    max: K,
+/// An element of an interval tree.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Element<K, V> {
+    /// The range associated with this element.
+    pub range: Range<K>,
+    /// The value associated with this element.
+    pub value: V,
+}
 
-    data: V,
+struct Node<K, V> {
+    element: Element<K, V>,
+    max: K,
 }
 
 /// A simple and generic implementation of an immutable interval tree.
@@ -23,9 +30,9 @@ pub struct IntervalTree<K, V> {
 
 impl<K: Ord + Clone, V> FromIterator<(Range<K>, V)> for IntervalTree<K, V> {
     fn from_iter<T: IntoIterator<Item = (Range<K>, V)>>(iter: T) -> Self {
-        let mut nodes: Vec<_> = iter.into_iter().map(|(k, v)| Node { max: k.end.clone(), range: k, data: v }).collect();
+        let mut nodes: Vec<_> = iter.into_iter().map(|(k, v)| Node { max: k.end.clone(), element: Element { range: k, value: v } }).collect();
 
-        nodes.sort_unstable_by(|a, b| a.range.start.cmp(&b.range.start));
+        nodes.sort_unstable_by(|a, b| a.element.range.start.cmp(&b.element.range.start));
 
         Self::update_max(&mut nodes);
 
@@ -127,7 +134,7 @@ impl<'a, K: Ord + Clone, V> Clone for QueryIter<'a, K, V> {
     }
 }
 
-impl<'a, K: Ord + Clone, V: Debug> Debug for QueryIter<'a, K, V> {
+impl<'a, K: Ord + Clone + Debug, V: Debug> Debug for QueryIter<'a, K, V> {
     fn fmt(&self, fmt: &mut Formatter) -> FmtResult {
         let v: Vec<_> = (*self).clone().collect();
         write!(fmt, "{:?}", v)
@@ -135,9 +142,9 @@ impl<'a, K: Ord + Clone, V: Debug> Debug for QueryIter<'a, K, V> {
 }
 
 impl<'a, K: Ord, V> Iterator for QueryIter<'a, K, V> {
-    type Item = &'a V;
+    type Item = &'a Element<K, V>;
 
-    fn next(&mut self) -> Option<&'a V> {
+    fn next(&mut self) -> Option<&'a Element<K, V>> {
         while let Some((s, l)) = self.todo.pop() {
             let i = s + l/2;
 
@@ -151,7 +158,7 @@ impl<'a, K: Ord, V> Iterator for QueryIter<'a, K, V> {
                     }
                 }
 
-                if self.query.go_right(&node.range.start) {
+                if self.query.go_right(&node.element.range.start) {
                     // push right
                     {
                         let rightsz = l + s - i - 1;
@@ -162,8 +169,8 @@ impl<'a, K: Ord, V> Iterator for QueryIter<'a, K, V> {
 
                     // finally, search this
                     //if self.query.point() < node.range.end {
-                    if self.query.intersect(&node.range) {
-                        return Some(&node.data);
+                    if self.query.intersect(&node.element.range) {
+                        return Some(&node.element);
                     }
                 }
             }
@@ -177,9 +184,9 @@ mod tests {
     use super::*;
 
     fn verify(tree: &IntervalTree<u32, u32>, i: u32, expected: &[u32]) {
-        let mut v1: Vec<_> = tree.query_point(i).cloned().collect();
+        let mut v1: Vec<_> = tree.query_point(i).map(|x| x.value).collect();
         v1.sort();
-        let mut v2: Vec<_> = tree.query(i..(i+1)).cloned().collect();
+        let mut v2: Vec<_> = tree.query(i..(i+1)).map(|x| x.value).collect();
         v2.sort();
         assert_eq!(v1, expected);
         assert_eq!(v2, expected);
