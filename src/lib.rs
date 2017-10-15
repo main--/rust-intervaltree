@@ -17,6 +17,13 @@ pub struct Element<K, V> {
     pub value: V,
 }
 
+impl<K, V> From<(Range<K>, V)> for Element<K, V> {
+    fn from(tup: (Range<K>, V)) -> Element<K, V> {
+        let (range, value) = tup;
+        Element { range, value }
+    }
+}
+
 #[derive(Clone, Debug, Hash)]
 struct Node<K, V>{
     element: Element<K, V>,
@@ -32,9 +39,10 @@ pub struct IntervalTree<K, V> {
     data: Vec<Node<K, V>>,
 }
 
-impl<K: Ord + Clone, V> FromIterator<(Range<K>, V)> for IntervalTree<K, V> {
-    fn from_iter<T: IntoIterator<Item = (Range<K>, V)>>(iter: T) -> Self {
-        let mut nodes: Vec<_> = iter.into_iter().map(|(k, v)| Node { max: k.end.clone(), element: Element { range: k, value: v } }).collect();
+impl<K: Ord + Clone, V, I: Into<Element<K, V>>> FromIterator<I> for IntervalTree<K, V> {
+    fn from_iter<T: IntoIterator<Item = I>>(iter: T) -> Self {
+        let mut nodes: Vec<_> = iter.into_iter().map(|i| i.into())
+            .map(|element| Node { max: element.range.end.clone(), element }).collect();
 
         nodes.sort_unstable_by(|a, b| a.element.range.start.cmp(&b.element.range.start));
 
