@@ -6,3 +6,4 @@ license = "MIT"
 description = "A simple and generic implementation of an immutable interval tree."
 
 [dependencies]
+smallvec = "0.4"

@@ -1,12 +1,15 @@
 #![warn(missing_docs)]
 //! A simple and generic implementation of an immutable interval tree.
 
+extern crate smallvec;
+
 use std::ops::Range;
 use std::iter::FromIterator;
 use std::fmt::{Debug, Formatter, Result as FmtResult};
 use std::slice::Iter;
 use std::vec::IntoIter;
 use std::cmp;
+use smallvec::SmallVec;
 
 /// An element of an interval tree.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -124,7 +127,7 @@ impl<K: Ord, V> IntervalTree<K, V> {
         QueryIter {
             tree: self,
             query: Query::Range(range),
-            todo: vec![(0, self.data.len())],
+            todo: SmallVec::from_slice(&[(0, self.data.len())]),
         }
     }
 
@@ -135,7 +138,7 @@ impl<K: Ord, V> IntervalTree<K, V> {
         QueryIter {
             tree: self,
             query: Query::Point(point),
-            todo: vec![(0, self.data.len())],
+            todo: SmallVec::from_slice(&[(0, self.data.len())]),
         }
     }
 
@@ -177,7 +180,7 @@ impl<K: Ord> Query<K> {
 /// Iterator for query results.
 pub struct QueryIter<'a, K: 'a, V: 'a> {
     tree: &'a IntervalTree<K, V>,
-    todo: Vec<(usize, usize)>,
+    todo: SmallVec<[(usize, usize); 16]>,
     query: Query<K>,
 }
 
