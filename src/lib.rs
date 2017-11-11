@@ -49,7 +49,9 @@ impl<K: Ord + Clone, V, I: Into<Element<K, V>>> FromIterator<I> for IntervalTree
 
         nodes.sort_unstable_by(|a, b| a.element.range.start.cmp(&b.element.range.start));
 
-        Self::update_max(&mut nodes);
+        if !nodes.is_empty() {
+            Self::update_max(&mut nodes);
+        }
 
         IntervalTree { data: nodes }
     }
@@ -120,14 +122,22 @@ impl<K: Ord + Clone, V> IntervalTree<K, V> {
 }
 
 impl<K: Ord, V> IntervalTree<K, V> {
+    fn todo(&self) -> TodoVec {
+        let mut todo = SmallVec::new();
+        if !self.data.is_empty() {
+            todo.push((0, self.data.len()));
+        }
+        todo
+    }
+
     /// Queries the interval tree for all elements overlapping a given interval.
     ///
     /// This runs in `O(log n + m)`.
     pub fn query(&self, range: Range<K>) -> QueryIter<K, V> {
         QueryIter {
+            todo: self.todo(),
             tree: self,
             query: Query::Range(range),
-            todo: SmallVec::from_slice(&[(0, self.data.len())]),
         }
     }
 
@@ -136,9 +146,9 @@ impl<K: Ord, V> IntervalTree<K, V> {
     /// This runs in `O(log n + m)`.
     pub fn query_point(&self, point: K) -> QueryIter<K, V> {
         QueryIter {
+            todo: self.todo(),
             tree: self,
             query: Query::Point(point),
-            todo: SmallVec::from_slice(&[(0, self.data.len())]),
         }
     }
 
@@ -177,10 +187,12 @@ impl<K: Ord> Query<K> {
     }
 }
 
+type TodoVec = SmallVec<[(usize, usize); 16]>;
+
 /// Iterator for query results.
 pub struct QueryIter<'a, K: 'a, V: 'a> {
     tree: &'a IntervalTree<K, V>,
-    todo: SmallVec<[(usize, usize); 16]>,
+    todo: TodoVec,
     query: Query<K>,
 }
 
@@ -240,6 +252,7 @@ impl<'a, K: Ord, V> Iterator for QueryIter<'a, K, V> {
 
 #[cfg(test)]
 mod tests {
+    use std::iter;
     use super::*;
 
     fn verify(tree: &IntervalTree<u32, u32>, i: u32, expected: &[u32]) {
@@ -275,5 +288,11 @@ mod tests {
         verify(&tree, 7, &[6]);
         verify(&tree, 8, &[]);
         verify(&tree, 9, &[]);
+    }
+
+    #[test]
+    fn empty() {
+        let tree: IntervalTree<u32, u32> = iter::empty::<Element<u32, u32>>().collect();
+        verify(&tree, 42, &[]);
     }
 }
