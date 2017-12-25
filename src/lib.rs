@@ -1,14 +1,24 @@
+#![no_std]
+#![cfg_attr(not(feature = "std"), feature(alloc))]
 #![warn(missing_docs)]
 //! A simple and generic implementation of an immutable interval tree.
 
+#[cfg(feature = "std")]
+extern crate std;
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
 extern crate smallvec;
 
-use std::ops::Range;
-use std::iter::FromIterator;
-use std::fmt::{Debug, Formatter, Result as FmtResult};
-use std::slice::Iter;
-use std::vec::IntoIter;
-use std::cmp;
+use core::ops::Range;
+use core::iter::FromIterator;
+use core::fmt::{Debug, Formatter, Result as FmtResult};
+use core::slice::Iter;
+use core::cmp;
+#[cfg(feature = "std")]
+use std::vec::{Vec, IntoIter};
+#[cfg(not(feature = "std"))]
+use alloc::vec::{Vec, IntoIter};
 use smallvec::SmallVec;
 
 /// An element of an interval tree.
@@ -252,7 +262,7 @@ impl<'a, K: Ord, V> Iterator for QueryIter<'a, K, V> {
 
 #[cfg(test)]
 mod tests {
-    use std::iter;
+    use core::iter;
     use super::*;
 
     fn verify(tree: &IntervalTree<u32, u32>, i: u32, expected: &[u32]) {
