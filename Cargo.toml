@@ -6,6 +6,11 @@ version = "0.2.2"
 authors = ["main() <main@ehvag.de>"]
 license = "MIT"
 description = "A simple and generic implementation of an immutable interval tree."
+categories = ["data-structures", "no-std"]
 
 [dependencies]
-smallvec = "0.4"
+smallvec = { version = "0.4", default-features = false }
+
+[features]
+std = ["smallvec/std"]
+default = ["std"]
