@@ -2,7 +2,7 @@
 name = "intervaltree"
 documentation = "https://docs.rs/intervaltree"
 repository = "https://github.com/main--/rust-intervaltree"
-version = "0.2.3"
+version = "0.2.4"
 authors = ["main() <main@ehvag.de>"]
 license = "MIT"
 description = "A simple and generic implementation of an immutable interval tree."
