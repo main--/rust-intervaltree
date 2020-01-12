@@ -9,8 +9,8 @@ description = "A simple and generic implementation of an immutable interval tree
 categories = ["data-structures", "no-std"]
 
 [dependencies]
-smallvec = { version = "0.6", default-features = false }
+smallvec = { version = "1.0.0" }
 
 [features]
-std = ["smallvec/std"]
+std = []
 default = ["std"]
