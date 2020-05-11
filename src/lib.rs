@@ -166,6 +166,14 @@ impl<K: Ord, V> IntervalTree<K, V> {
     pub fn iter(&self) -> TreeIter<K, V> {
         TreeIter(self.data.iter())
     }
+
+    /// Returns an iterator over all elements in the tree, sorted by `Element.range.start`.
+    ///
+    /// This is currently identical to `IntervalTree::iter` because the internal structure
+    /// is already sorted this way, but may not be in the future.
+    pub fn iter_sorted<'a>(&'a self) -> impl Iterator<Item=&'a Element<K, V>> {
+        TreeIter(self.data.iter())
+    }
 }
 
 #[derive(Clone)]
