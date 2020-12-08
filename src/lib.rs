@@ -1,5 +1,4 @@
 #![no_std]
-#![cfg_attr(not(feature = "std"), feature(alloc))]
 #![warn(missing_docs)]
 //! A simple and generic implementation of an immutable interval tree.
 
@@ -7,8 +6,6 @@
 extern crate std;
 #[cfg(not(feature = "std"))]
 extern crate alloc;
-
-extern crate smallvec;
 
 use core::ops::Range;
 use core::iter::FromIterator;
@@ -171,7 +168,7 @@ impl<K: Ord, V> IntervalTree<K, V> {
     ///
     /// This is currently identical to `IntervalTree::iter` because the internal structure
     /// is already sorted this way, but may not be in the future.
-    pub fn iter_sorted<'a>(&'a self) -> impl Iterator<Item=&'a Element<K, V>> {
+    pub fn iter_sorted(&self) -> impl Iterator<Item=&Element<K, V>> {
         TreeIter(self.data.iter())
     }
 }
