@@ -2,24 +2,29 @@
 #![warn(missing_docs)]
 //! A simple and generic implementation of an immutable interval tree.
 
-#[cfg(feature = "std")]
-extern crate std;
 #[cfg(not(feature = "std"))]
 extern crate alloc;
-
-use core::ops::Range;
-use core::iter::FromIterator;
-use core::fmt::{Debug, Formatter, Result as FmtResult};
-use core::slice::Iter;
-use core::cmp;
+#[cfg(feature = "serde")]
+extern crate serde;
 #[cfg(feature = "std")]
-use std::vec::{Vec, IntoIter};
+extern crate std;
+
 #[cfg(not(feature = "std"))]
-use alloc::vec::{Vec, IntoIter};
+use alloc::vec::{IntoIter, Vec};
+use core::cmp;
+use core::fmt::{Debug, Formatter, Result as FmtResult};
+use core::iter::FromIterator;
+use core::ops::Range;
+use core::slice::Iter;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
+#[cfg(feature = "std")]
+use std::vec::{IntoIter, Vec};
 
 /// An element of an interval tree.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Element<K, V> {
     /// The range associated with this element.
     pub range: Range<K>,
@@ -35,7 +40,8 @@ impl<K, V> From<(Range<K>, V)> for Element<K, V> {
 }
 
 #[derive(Clone, Debug, Hash)]
-struct Node<K, V>{
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+struct Node<K, V> {
     element: Element<K, V>,
     max: K,
 }
@@ -45,6 +51,7 @@ struct Node<K, V>{
 /// To build it, always use `FromIterator`. This is not very optimized
 /// as it takes `O(log n)` stack (it uses recursion) but runs in `O(n log n)`.
 #[derive(Clone, Debug, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct IntervalTree<K, V> {
     data: Vec<Node<K, V>>,
 }

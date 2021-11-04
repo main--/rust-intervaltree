@@ -11,6 +11,7 @@ edition = "2018"
 
 [dependencies]
 smallvec = { version = "1.0.0" }
+serde = { version = "1.0", default-features = false, features = ["alloc", "derive"], optional = true }
 
 [features]
 std = []
