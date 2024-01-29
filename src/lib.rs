@@ -144,25 +144,17 @@ impl<K: Ord, V> IntervalTree<K, V> {
         todo
     }
 
-    /// Queries the interval tree for all elements overlapping a given interval.
+    /// Queries the interval tree for all elements matching the given query.
+    ///
+    /// A query can be an interval `Range<K>` matching all overlapping intervals or a point `K` matching all intervals containing the point.
     ///
     /// This runs in `O(log n + m)`.
-    pub fn query(&self, range: Range<K>) -> QueryIter<K, V, Range<K>> {
+    #[allow(private_bounds)]
+    pub fn query<Q: Query<K>>(&self, query: Q) -> QueryIter<K, V, Q> {
         QueryIter {
             todo: self.todo(),
             tree: self,
-            query: range,
-        }
-    }
-
-    /// Queries the interval tree for all elements containing a given point.
-    ///
-    /// This runs in `O(log n + m)`.
-    pub fn query_point(&self, point: K) -> QueryIter<K, V, K> {
-        QueryIter {
-            todo: self.todo(),
-            tree: self,
-            query: point,
+            query,
         }
     }
 
@@ -283,7 +275,7 @@ mod tests {
     use super::*;
 
     fn verify(tree: &IntervalTree<u32, u32>, i: u32, expected: &[u32]) {
-        let mut v1: Vec<_> = tree.query_point(i).map(|x| x.value).collect();
+        let mut v1: Vec<_> = tree.query(i).map(|x| x.value).collect();
         v1.sort();
         let mut v2: Vec<_> = tree.query(i..(i+1)).map(|x| x.value).collect();
         v2.sort();
