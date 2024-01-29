@@ -58,8 +58,14 @@ pub struct IntervalTree<K, V> {
 
 impl<K: Ord + Clone, V, I: Into<Element<K, V>>> FromIterator<I> for IntervalTree<K, V> {
     fn from_iter<T: IntoIterator<Item = I>>(iter: T) -> Self {
-        let mut nodes: Vec<_> = iter.into_iter().map(|i| i.into())
-            .map(|element| Node { max: element.range.end.clone(), element }).collect();
+        let mut nodes: Vec<_> = iter
+            .into_iter()
+            .map(|i| i.into())
+            .map(|element| Node {
+                max: element.range.end.clone(),
+                element,
+            })
+            .collect();
 
         nodes.sort_unstable_by(|a, b| a.element.range.start.cmp(&b.element.range.start));
 
@@ -175,7 +181,7 @@ impl<K: Ord, V> IntervalTree<K, V> {
     ///
     /// This is currently identical to `IntervalTree::iter` because the internal structure
     /// is already sorted this way, but may not be in the future.
-    pub fn iter_sorted(&self) -> impl Iterator<Item=&Element<K, V>> {
+    pub fn iter_sorted(&self) -> impl Iterator<Item = &Element<K, V>> {
         TreeIter(self.data.iter())
     }
 }
@@ -240,7 +246,7 @@ impl<'a, K: Ord, V> Iterator for QueryIter<'a, K, V> {
 
     fn next(&mut self) -> Option<&'a Element<K, V>> {
         while let Some((s, l)) = self.todo.pop() {
-            let i = s + l/2;
+            let i = s + l / 2;
 
             let node = &self.tree.data[i];
             if self.query.point() < &node.max {
@@ -274,13 +280,14 @@ impl<'a, K: Ord, V> Iterator for QueryIter<'a, K, V> {
 
 #[cfg(test)]
 mod tests {
-    use core::iter;
     use super::*;
+
+    use core::iter;
 
     fn verify(tree: &IntervalTree<u32, u32>, i: u32, expected: &[u32]) {
         let mut v1: Vec<_> = tree.query_point(i).map(|x| x.value).collect();
         v1.sort();
-        let mut v2: Vec<_> = tree.query(i..(i+1)).map(|x| x.value).collect();
+        let mut v2: Vec<_> = tree.query(i..(i + 1)).map(|x| x.value).collect();
         v2.sort();
         assert_eq!(v1, expected);
         assert_eq!(v2, expected);
@@ -297,8 +304,10 @@ mod tests {
             (5..8, 6),
             (4..5, 7),
             (2..7, 8),
-        ].iter().cloned().collect();
-
+        ]
+        .iter()
+        .cloned()
+        .collect();
 
         verify(&tree, 0, &[1]);
         verify(&tree, 1, &[1, 2]);
