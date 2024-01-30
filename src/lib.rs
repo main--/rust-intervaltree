@@ -274,8 +274,11 @@ impl<'a, K: Ord, V> Iterator for QueryIter<'a, K, V> {
 
 #[cfg(test)]
 mod tests {
-    use core::iter;
     use super::*;
+
+    use core::iter;
+
+    use proptest::{collection::vec, test_runner::TestRunner};
 
     fn verify(tree: &IntervalTree<u32, u32>, i: u32, expected: &[u32]) {
         let mut v1: Vec<_> = tree.query_point(i).map(|x| x.value).collect();
@@ -316,5 +319,44 @@ mod tests {
     fn empty() {
         let tree: IntervalTree<u32, u32> = iter::empty::<Element<u32, u32>>().collect();
         verify(&tree, 42, &[]);
+    }
+
+    #[test]
+    fn random() {
+        const DOM: Range<i32> = -1000..1000;
+        const LEN: usize = 1000_usize;
+
+        TestRunner::default()
+            .run(
+                &(vec(DOM, LEN), vec(DOM, LEN), DOM, DOM),
+                |(start, end, query_start, query_end)| {
+                    let tree = start
+                        .iter()
+                        .zip(&end)
+                        .map(|(&start, &end)| Element {
+                            range: start..end,
+                            value: (),
+                        })
+                        .collect::<IntervalTree<_, _>>();
+
+                    let mut result1 = tree.query(query_start..query_end).collect::<Vec<_>>();
+
+                    let mut result2 = tree
+                        .iter()
+                        .filter(|element| {
+                            query_end > element.range.start && query_start < element.range.end
+                        })
+                        .collect::<Vec<_>>();
+
+                    result1
+                        .sort_unstable_by_key(|element| (element.range.start, element.range.end));
+                    result2
+                        .sort_unstable_by_key(|element| (element.range.start, element.range.end));
+                    assert_eq!(result1, result2);
+
+                    Ok(())
+                },
+            )
+            .unwrap()
     }
 }

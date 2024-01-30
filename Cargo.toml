@@ -16,3 +16,6 @@ serde = { version = "1.0", default-features = false, features = ["alloc", "deriv
 [features]
 std = []
 default = ["std"]
+
+[dev-dependencies]
+proptest = "1.4.0"
