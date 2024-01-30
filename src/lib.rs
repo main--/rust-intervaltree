@@ -144,25 +144,17 @@ impl<K: Ord, V> IntervalTree<K, V> {
         todo
     }
 
-    /// Queries the interval tree for all elements overlapping a given interval.
+    /// Queries the interval tree for all elements matching the given query.
+    ///
+    /// A query can be an interval `Range<K>` matching all overlapping intervals or a point `K` matching all intervals containing the point.
     ///
     /// This runs in `O(log n + m)`.
-    pub fn query(&self, range: Range<K>) -> QueryIter<K, V> {
+    #[allow(private_bounds)]
+    pub fn query<Q: Query<K>>(&self, query: Q) -> QueryIter<K, V, Q> {
         QueryIter {
             todo: self.todo(),
             tree: self,
-            query: Query::Range(range),
-        }
-    }
-
-    /// Queries the interval tree for all elements containing a given point.
-    ///
-    /// This runs in `O(log n + m)`.
-    pub fn query_point(&self, point: K) -> QueryIter<K, V> {
-        QueryIter {
-            todo: self.todo(),
-            tree: self,
-            query: Query::Point(point),
+            query,
         }
     }
 
@@ -180,45 +172,50 @@ impl<K: Ord, V> IntervalTree<K, V> {
     }
 }
 
-#[derive(Clone)]
-enum Query<K> {
-    Point(K),
-    Range(Range<K>),
+trait Query<K> {
+    fn point(&self) -> &K;
+    fn go_right(&self, start: &K) -> bool;
+    fn intersect(&self, range: &Range<K>) -> bool;
 }
 
-impl<K: Ord> Query<K> {
+impl<K: Ord> Query<K> for K {
     fn point(&self) -> &K {
-        match *self {
-            Query::Point(ref k) => k,
-            Query::Range(ref r) => &r.start,
-        }
+        self
     }
 
     fn go_right(&self, start: &K) -> bool {
-        match *self {
-            Query::Point(ref k) => k >= start,
-            Query::Range(ref r) => &r.end > start,
-        }
+        self >= start
     }
 
     fn intersect(&self, range: &Range<K>) -> bool {
-        match *self {
-            Query::Point(ref k) => k < &range.end,
-            Query::Range(ref r) => r.end > range.start && r.start < range.end,
-        }
+        self < &range.end
+    }
+}
+
+impl<K: Ord> Query<K> for Range<K> {
+    fn point(&self) -> &K {
+        &self.start
+    }
+
+    fn go_right(&self, start: &K) -> bool {
+        &self.end > start
+    }
+
+    fn intersect(&self, range: &Range<K>) -> bool {
+        self.end > range.start && self.start < range.end
     }
 }
 
 type TodoVec = SmallVec<[(usize, usize); 16]>;
 
 /// Iterator for query results.
-pub struct QueryIter<'a, K: 'a, V: 'a> {
+pub struct QueryIter<'a, K: 'a, V: 'a, Q> {
     tree: &'a IntervalTree<K, V>,
     todo: TodoVec,
-    query: Query<K>,
+    query: Q,
 }
 
-impl<'a, K: Ord + Clone, V> Clone for QueryIter<'a, K, V> {
+impl<'a, K: Ord + Clone, V, Q: Clone> Clone for QueryIter<'a, K, V, Q> {
     fn clone(&self) -> Self {
         QueryIter {
             tree: self.tree,
@@ -228,14 +225,14 @@ impl<'a, K: Ord + Clone, V> Clone for QueryIter<'a, K, V> {
     }
 }
 
-impl<'a, K: Ord + Clone + Debug, V: Debug> Debug for QueryIter<'a, K, V> {
+impl<'a, K: Ord + Clone + Debug, V: Debug, Q: Query<K> + Clone> Debug for QueryIter<'a, K, V, Q> {
     fn fmt(&self, fmt: &mut Formatter) -> FmtResult {
         let v: Vec<_> = (*self).clone().collect();
         write!(fmt, "{:?}", v)
     }
 }
 
-impl<'a, K: Ord, V> Iterator for QueryIter<'a, K, V> {
+impl<'a, K: Ord, V, Q: Query<K>> Iterator for QueryIter<'a, K, V, Q> {
     type Item = &'a Element<K, V>;
 
     fn next(&mut self) -> Option<&'a Element<K, V>> {
@@ -278,7 +275,7 @@ mod tests {
     use super::*;
 
     fn verify(tree: &IntervalTree<u32, u32>, i: u32, expected: &[u32]) {
-        let mut v1: Vec<_> = tree.query_point(i).map(|x| x.value).collect();
+        let mut v1: Vec<_> = tree.query(i).map(|x| x.value).collect();
         v1.sort();
         let mut v2: Vec<_> = tree.query(i..(i+1)).map(|x| x.value).collect();
         v2.sort();
