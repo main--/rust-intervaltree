@@ -33,8 +33,7 @@ pub struct Element<K, V> {
 }
 
 impl<K, V> From<(Range<K>, V)> for Element<K, V> {
-    fn from(tup: (Range<K>, V)) -> Element<K, V> {
-        let (range, value) = tup;
+    fn from((range, value): (Range<K>, V)) -> Element<K, V> {
         Element { range, value }
     }
 }
@@ -53,7 +52,7 @@ struct Node<K, V> {
 #[derive(Clone, Debug, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct IntervalTree<K, V> {
-    data: Vec<Node<K, V>>,
+    nodes: Vec<Node<K, V>>,
 }
 
 impl<K: Ord + Clone, V, I: Into<Element<K, V>>> FromIterator<I> for IntervalTree<K, V> {
@@ -67,7 +66,7 @@ impl<K: Ord + Clone, V, I: Into<Element<K, V>>> FromIterator<I> for IntervalTree
             Self::update_max(&mut nodes);
         }
 
-        IntervalTree { data: nodes }
+        IntervalTree { nodes }
     }
 }
 
@@ -99,7 +98,7 @@ impl<K, V> IntoIterator for IntervalTree<K, V> {
     type IntoIter = TreeIntoIter<K, V>;
 
     fn into_iter(self) -> TreeIntoIter<K, V> {
-        TreeIntoIter(self.data.into_iter())
+        TreeIntoIter(self.nodes.into_iter())
     }
 }
 
@@ -113,33 +112,28 @@ impl<K, V> Iterator for TreeIntoIter<K, V> {
 
 impl<K: Ord + Clone, V> IntervalTree<K, V> {
     fn update_max(nodes: &mut [Node<K, V>]) -> K {
-        assert!(!nodes.is_empty());
-        let i = nodes.len() / 2;
-        if nodes.len() > 1 {
-            {
-                let (left, rest) = nodes.split_at_mut(i);
-                if !left.is_empty() {
-                    rest[0].max = cmp::max(rest[0].max.clone(), Self::update_max(left));
-                }
-            }
+        debug_assert!(!nodes.is_empty());
 
-            {
-                let (rest, right) = nodes.split_at_mut(i + 1);
-                if !right.is_empty() {
-                    rest[i].max = cmp::max(rest[i].max.clone(), Self::update_max(right));
-                }
-            }
+        let (left, rest) = nodes.split_at_mut(nodes.len() / 2);
+        let (mid, right) = rest.split_first_mut().unwrap();
+
+        if !left.is_empty() {
+            mid.max = cmp::max(mid.max.clone(), Self::update_max(left));
         }
 
-        nodes[i].max.clone()
+        if !right.is_empty() {
+            mid.max = cmp::max(mid.max.clone(), Self::update_max(right));
+        }
+
+        mid.max.clone()
     }
 }
 
 impl<K: Ord, V> IntervalTree<K, V> {
-    fn todo(&self) -> TodoVec {
+    fn todo(&self) -> TodoVec<'_, K, V> {
         let mut todo = SmallVec::new();
-        if !self.data.is_empty() {
-            todo.push((0, self.data.len()));
+        if !self.nodes.is_empty() {
+            todo.push(&*self.nodes);
         }
         todo
     }
@@ -150,7 +144,6 @@ impl<K: Ord, V> IntervalTree<K, V> {
     pub fn query(&self, range: Range<K>) -> QueryIter<K, V> {
         QueryIter {
             todo: self.todo(),
-            tree: self,
             query: Query::Range(range),
         }
     }
@@ -161,14 +154,13 @@ impl<K: Ord, V> IntervalTree<K, V> {
     pub fn query_point(&self, point: K) -> QueryIter<K, V> {
         QueryIter {
             todo: self.todo(),
-            tree: self,
             query: Query::Point(point),
         }
     }
 
     /// Returns an iterator over all elements in the tree (in no particular order).
     pub fn iter(&self) -> TreeIter<K, V> {
-        TreeIter(self.data.iter())
+        TreeIter(self.nodes.iter())
     }
 
     /// Returns an iterator over all elements in the tree, sorted by `Element.range.start`.
@@ -176,7 +168,7 @@ impl<K: Ord, V> IntervalTree<K, V> {
     /// This is currently identical to `IntervalTree::iter` because the internal structure
     /// is already sorted this way, but may not be in the future.
     pub fn iter_sorted(&self) -> impl Iterator<Item=&Element<K, V>> {
-        TreeIter(self.data.iter())
+        TreeIter(self.nodes.iter())
     }
 }
 
@@ -209,19 +201,17 @@ impl<K: Ord> Query<K> {
     }
 }
 
-type TodoVec = SmallVec<[(usize, usize); 16]>;
+type TodoVec<'a, K, V> = SmallVec<[&'a [Node<K, V>]; 16]>;
 
 /// Iterator for query results.
 pub struct QueryIter<'a, K: 'a, V: 'a> {
-    tree: &'a IntervalTree<K, V>,
-    todo: TodoVec,
+    todo: TodoVec<'a, K, V>,
     query: Query<K>,
 }
 
 impl<'a, K: Ord + Clone, V> Clone for QueryIter<'a, K, V> {
     fn clone(&self) -> Self {
         QueryIter {
-            tree: self.tree,
             todo: self.todo.clone(),
             query: self.query.clone(),
         }
@@ -239,31 +229,25 @@ impl<'a, K: Ord, V> Iterator for QueryIter<'a, K, V> {
     type Item = &'a Element<K, V>;
 
     fn next(&mut self) -> Option<&'a Element<K, V>> {
-        while let Some((s, l)) = self.todo.pop() {
-            let i = s + l/2;
+        while let Some(nodes) = self.todo.pop() {
+            let (left, rest) = nodes.split_at(nodes.len() / 2);
+            let (mid, right) = rest.split_first().unwrap();
 
-            let node = &self.tree.data[i];
-            if self.query.point() < &node.max {
+            if self.query.point() < &mid.max {
                 // push left
-                {
-                    let leftsz = i - s;
-                    if leftsz > 0 {
-                        self.todo.push((s, leftsz));
-                    }
+                if !left.is_empty() {
+                    self.todo.push(left);
                 }
 
-                if self.query.go_right(&node.element.range.start) {
+                if self.query.go_right(&mid.element.range.start) {
                     // push right
-                    {
-                        let rightsz = l + s - i - 1;
-                        if rightsz > 0 {
-                            self.todo.push((i + 1, rightsz));
-                        }
+                    if !right.is_empty() {
+                        self.todo.push(right);
                     }
 
                     // finally, search this
-                    if self.query.intersect(&node.element.range) {
-                        return Some(&node.element);
+                    if self.query.intersect(&mid.element.range) {
+                        return Some(&mid.element);
                     }
                 }
             }
